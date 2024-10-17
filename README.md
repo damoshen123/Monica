@@ -11,11 +11,9 @@
 3. 双击运行`Start.bat`文件。这将自动安装依赖并启动服务器。
 
 服务器将在 http://localhost:3000 上运行。
-
-酒馆配置为  http://localhost:3000/v1
 ## 配置
 
-在 config.json文件中 编辑 设置端口 cookie 和 代理  ！！！
+在 config.json文件中 设置端口 cookie 和 代理
 
 ## cookie 获取
 

@@ -6,7 +6,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer } from 'ws';
 import cors from 'cors';
-import fs from "fs";
+import fs from 'fs';
+import fsPromises from 'fs/promises';
 import os from 'os';
 import { createRequire } from 'module';
 import EventSource from'eventsource';
@@ -42,7 +43,7 @@ let  rrreeeqqq;
 async function initializeBrowser() {
     try {
         browser = await puppeteer.launch({
-            headless: false,
+            headless: config.wutou,
             args: ['--window-size=800,600'],
             defaultViewport: {
                 width: 800,
@@ -242,7 +243,7 @@ async function sendMessage(res3, message) {
             console.log('Element with class "chat-toolbar-item--at7NB" not found');
         }
 
-        await clickElement('.chat-toolbar-item--at7NB', page);
+       // await clickElement('.chat-toolbar-item--at7NB', page);
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         // 上传文件
@@ -276,18 +277,109 @@ async function clickElement(selector, page) {
 }
 
 async function uploadFile(selector, filePath, page) {
-    const element = await page.$(selector);
-    if (element) {
-        console.log(`Successfully found the element with class "${selector}"`);
-        const [fileChooser] = await Promise.all([
-            page.waitForFileChooser(),
-            page.click(selector),
-        ]);
-        await fileChooser.accept([filePath]);
-    } else {
-        console.log(`Element with class "${selector}" not found`);
+    // const element = await page.$(selector);
+    // if (element) {
+    //     console.log(`Successfully found the element with class "${selector}"`);
+    //     const [fileChooser] = await Promise.all([
+    //         page.waitForFileChooser(),
+    //         page.click(selector),
+    //     ]);
+    //     await fileChooser.accept([filePath]);
+    // } else {
+    //     console.log(`Element with class "${selector}" not found`);
+    // }
+    try {
+        // 读取文件内容
+        const fileContent = await fsPromises.readFile(filePath);
+        const fileName = path.basename(filePath);
+    
+        console.log(`File size: ${fileContent.length} bytes`);
+    
+        // 获取文件类型
+        const fileType = getFileType(fileName);
+    
+        // 在浏览器中执行文件上传模拟
+        await page.evaluate(async ({ fileName, fileContent, fileType }) => {
+          // 将 ArrayBuffer 转换为 Uint8Array
+          const uint8Array = new Uint8Array(fileContent);
+          
+          // 将 Uint8Array 转换为 Blob
+          const blob = new Blob([uint8Array], { type: fileType });
+          
+          console.log(`Blob size: ${blob.size} bytes`);
+    
+          // 创建 File 对象
+          const file = new File([blob], fileName, { type: fileType });
+          
+          console.log(`File size: ${file.size} bytes`);
+    
+          // 创建 DataTransfer 对象
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+    
+          // 创建拖拽事件
+          const createDragEvent = (type) => {
+            return new DragEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              dataTransfer: dataTransfer
+            });
+          };
+    
+          // 模拟拖拽过程
+          const dropZone = document.querySelector('.chat-box--nfsbl') || document.body;
+          
+          dropZone.dispatchEvent(createDragEvent('dragenter'));
+          dropZone.dispatchEvent(createDragEvent('dragover'));
+          dropZone.dispatchEvent(createDragEvent('drop'));
+    
+          console.log('File upload simulation completed for:', fileName);
+        }, { fileName, fileContent: Array.from(fileContent), fileType });
+    
+        console.log('File upload process completed successfully.');
+      } catch (error) {
+        console.error('Error during file upload:', error);
+        throw error;
+      }
+      
+    function getFileType(fileName) {
+        const extension = path.extname(fileName).toLowerCase();
+        switch (extension) {
+          case '.jpg':
+          case '.jpeg':
+            return 'image/jpeg';
+          case '.png':
+            return 'image/png';
+          case '.gif':
+            return 'image/gif';
+          case '.pdf':
+            return 'application/pdf';
+          default:
+            return 'application/octet-stream';
+        }
+      }
     }
-}
+    
+    
+
+
+
+function getFileType(fileName) {
+  const extension = path.extname(fileName).toLowerCase();
+  switch (extension) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.png':
+      return 'image/png';
+    case '.gif':
+      return 'image/gif';
+    case '.pdf':
+      return 'application/pdf';
+    default:
+      return 'application/octet-stream';
+  }
+ }
 
 async function setupRequestInterception(page, res4, setResponseEnded) {
     await page.setRequestInterception(true);
