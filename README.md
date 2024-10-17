@@ -1,6 +1,6 @@
 # Node.js中转站服务器
 
-这是一个用于Tampermonkey脚本的Node.js中转站服务器，专为Windows环境设计。
+这是一个用于Monica代理的Node.js中转站服务器，专为Windows环境设计。
 
 ## 快速开始
 
@@ -11,11 +11,14 @@
 3. 双击运行`Start.bat`文件。这将自动安装依赖并启动服务器。
 
 服务器将在 http://localhost:3000 上运行。
+## 配置
 
-## 手动安装步骤
+在 config.json文件中 设置端口 cookie 和 代理
 
-如果您更喜欢手动操作，请按照以下步骤进行：
+## cookie 获取
 
-1. 打开命令提示符，进入项目目录。
+可以按 f12 在网页的控制台中 输入 console.log(document.cookie);  来获取
 
-2. 运行以下命令安装依赖：
+## 投喂咖啡
+
+https://afdian.com/a/cqgnyy
