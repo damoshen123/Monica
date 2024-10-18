@@ -61,13 +61,22 @@ async function initializeBrowser() {
         }
         // 设置cookie
         await page.setCookie(...getSessionCookie(config.cookie));
-        await page.goto('https://monica.im/', { waitUntil: 'networkidle0' });
-        console.log('Successfully opened https://monica.im/');
+        await page.goto('https://monica.im/home', { waitUntil: 'networkidle0' });
+        console.log('Successfully opened https://monica.im/home');
         // 检查是否成功登录
         const isLoggedIn = await page.evaluate(() => {
             return document.querySelector('.icon--SJP_d') !== null;
         });
         console.log('Login status:', isLoggedIn);
+        
+        const element = await page.$('.monica-btn--TH1fg');
+        if (element) {
+            await element.click();
+            console.log(`Successfully clicked the element with class '.monica-btn--TH1fg"`);
+            console.log('欢迎使用Monica反代，成功启动！By从前跟你一样');
+        } else {
+            console.log(`Element with class "'.monica-btn--TH1fg'" not found`);
+        }
     } catch (error) {
         console.error('An error occurred during browser initialization:', error);
     }
