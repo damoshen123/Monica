@@ -76,6 +76,7 @@ async function initializeBrowser() {
             console.log('欢迎使用Monica反代，成功启动！By从前跟你一样');
         } else {
             console.log(`Element with class "'.monica-btn--TH1fg'" not found`);
+            console.log('欢迎使用Monica反代，成功启动！By从前跟你一样');
         }
     } catch (error) {
         console.error('An error occurred during browser initialization:', error);
@@ -235,7 +236,8 @@ async function sendMessage(res3, message) {
         message = message.messages;
         message = JSON.stringify(message);
         console.log('Formatted messages:', message);
-        const localCopyPath = path.join(__dirname, 'wenben.txt');
+        const txtname= Math.random().toString(36).substring(3);
+        const localCopyPath = path.join(__dirname, `${txtname+".txt"}`);
         fs.writeFileSync(localCopyPath, message);
         console.log(`Local copy of formatted messages saved to: ${localCopyPath}`);
 
@@ -284,6 +286,14 @@ async function sendMessage(res3, message) {
             customEventSource.close();
             return false;
         }
+        //删除文件
+        fs.unlink(localCopyPath, (err) => {
+            if (err) {
+              console.error('删除文件时出错:', err);
+              return;
+            }
+            console.log('文件已成功删除');
+          });
         // 发送消息
         await clickElement('.input-msg-btn--yXWjh', page);
         if (Aborted) {
