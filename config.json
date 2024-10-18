@@ -2,6 +2,6 @@
     "port": 3000,
     "cookie": "",
     "proxyUrl":"http://127.0.0.1:7890",
-    "wutou":true
+    "wutou":false
   }
   
