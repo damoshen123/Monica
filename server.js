@@ -112,7 +112,9 @@ const availableModels = [
 
 app.post('/v1/chat/completions', async (req, res) => {
     console.log('Received chat request');
-    resssss = res;
+    if(resssss==null){
+        resssss = res;
+    }
     Aborted = false;
 
     res.on('close', async () => {
@@ -120,6 +122,7 @@ app.post('/v1/chat/completions', async (req, res) => {
         Aborted = true;
         if(rrreeeqqq){
         rrreeeqqq.abort();
+        resssss=null;
     }
     });
 
@@ -237,13 +240,19 @@ async function sendMessage(res3, message) {
         console.log(`Local copy of formatted messages saved to: ${localCopyPath}`);
 
         // 重置页面状态（可选，视情况而定）
-       // await page.reload({ waitUntil: 'networkidle0' });
+       await page.reload({ waitUntil: 'networkidle0' });
 
         // 在适当的地方检查是否已中止
 
 
         // 等待并点击所需元素
         await page.waitForSelector('.chat-toolbar-item--at7NB', { timeout: 10000 });
+        if (Aborted) {
+            console.log('guanbi!!!!');
+            rrreeeqqq.abort();
+            customEventSource.close();
+            return false;
+        }
         const newmasg = await page.$$('.chat-toolbar-item--at7NB');
         if (newmasg) {
             await newmasg[4].click();
@@ -254,14 +263,35 @@ async function sendMessage(res3, message) {
 
        // await clickElement('.chat-toolbar-item--at7NB', page);
         await new Promise(resolve => setTimeout(resolve, 2000));
-
+        if (Aborted) {
+            console.log('guanbi!!!!');
+            rrreeeqqq.abort();
+            customEventSource.close();
+            return false;
+        }
         // 上传文件
         await uploadFile('.file-uploader--Aiixn', localCopyPath, page);
+        if (Aborted) {
+            console.log('guanbi!!!!');
+            rrreeeqqq.abort();
+            customEventSource.close();
+            return false;
+        }
         await new Promise(resolve => setTimeout(resolve, 2000));
-
+        if (Aborted) {
+            console.log('guanbi!!!!');
+            rrreeeqqq.abort();
+            customEventSource.close();
+            return false;
+        }
         // 发送消息
         await clickElement('.input-msg-btn--yXWjh', page);
-
+        if (Aborted) {
+            console.log('guanbi!!!!');
+            rrreeeqqq.abort();
+            customEventSource.close();
+            return false;
+        }
         // 设置请求拦截
         await setupRequestInterception(page, res3, () => isResponseEnded = true);
 
@@ -397,11 +427,7 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
         if (request.isHandled) return;
         request.isHandled = true;
 
-        if (Aborted) {
-            console.log('Request aborted, stopping interception');
-            request.abort();
-            return;
-        }
+
 
         if (request.url().includes('/custom_bot/chat')) {
             const newRequest = {
@@ -419,6 +445,7 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                         customEventSource.on('message', (event) => {
                             if (Aborted) {
                                 console.log('guanbi!!!!');
+                                rrreeeqqq.abort();
                                 customEventSource.close();
                                 return false;
                             }
@@ -444,6 +471,7 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                         function processStreamData(message) {
                             if (Aborted) {
                                 console.log('Request aborted, stopping data processing');
+                                rrreeeqqq.abort();
                                 return;
                             }
 
@@ -498,10 +526,10 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                                 customEventSource.removeAllListeners();
                                 customEventSource.close();
                             }
-                            if (!Aborted) {
+                            rrreeeqqq.abort();
                                 resssss.write(`data: [DONE]\n\n`);
                                 resssss.end();
-                            }
+                                
                             console.log('Response ended and resources cleaned up');
                         }
 
@@ -509,7 +537,10 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                         console.error('Error intercepting request:', error);
                         cleanupAndEnd('Error occurred');
                     }
+                   
+        
                 },
+                
             };
 
             await newRequest.continue();
