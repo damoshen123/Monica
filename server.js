@@ -242,7 +242,7 @@ async function sendMessage(res3, message) {
         console.log(`Local copy of formatted messages saved to: ${localCopyPath}`);
 
         // 重置页面状态（可选，视情况而定）
-       await page.reload({ waitUntil: 'networkidle0' });
+      // await page.reload({ waitUntil: 'networkidle0' });
 
         // 在适当的地方检查是否已中止
 
