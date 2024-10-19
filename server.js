@@ -444,13 +444,24 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                 ...request,
                 continue: async (overrides) => {
                     try {
-                        customEventSource = new CustomEventSource(request.url(), {
-                            method: request.method(),
-                            headers: request.headers(),
-                            body: request.postData(),
-                            agent: proxyAgent,
-                            timeout: 30000
-                        });
+                        if(config.proxy){
+                            customEventSource  = new CustomEventSource(request.url(), {
+                                method: request.method(),
+                                headers: request.headers(),
+                                body: request.postData(),
+                                agent: proxyAgent,
+                                timeout: 30000
+                            });
+                        }else{
+                            customEventSource  = new CustomEventSource(request.url(), {
+                                method: request.method(),
+                                headers: request.headers(),
+                                body: request.postData(),
+                                timeout: 30000
+                            });
+                        }
+
+
 
                         customEventSource.on('message', (event) => {
                             if (Aborted) {
