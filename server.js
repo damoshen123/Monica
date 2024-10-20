@@ -1,5 +1,5 @@
 import express from 'express';
-import http from 'http';
+import http, { get } from 'http';
 import https from 'https';
 import pkg from 'ws';
 import path from "path";
@@ -13,9 +13,16 @@ import { createRequire } from 'module';
 import EventSource from'eventsource';
 import HttpsProxyAgent from 'https-proxy-agent';
 import puppeteer from'puppeteer';
+import axios from 'axios';
+import si from 'systeminformation';
+import crypto from 'crypto';
+
+//版本号
+const banbenhao = "1.0";
 
 
 // 使用 createRequire 来导入 JSON 文件
+
 const require = createRequire(import.meta.url);
 const config = require('./config.json');
 const app = express();
@@ -25,9 +32,10 @@ let requestId = null;
 let resssss = null;
 let Aborted=false;
 let Message;
+let userId;
 // 设置本地代理
 const proxyUrl = config.proxyUrl;
-const proxyAgent = new HttpsProxyAgent(proxyUrl);
+const proxyAgent = config.proxy ? new HttpsProxyAgent(proxyUrl) : null;
 const EventEmitter = require('events');
 const URL = require('url').URL;
 const __filename = fileURLToPath(import.meta.url);
@@ -42,6 +50,72 @@ let page = null;
 let customEventSource;
 let  isRestarting;
 let  rrreeeqqq;
+
+// Worker 的基础 URL
+const baseUrl = 'https://tongji.damoshenworkersdev.workers.dev';
+
+
+// 创建 axios 实例
+const axiosInstance = axios.create({
+  baseURL: baseUrl,
+  httpsAgent: proxyAgent
+});
+
+// 获取版本号
+async function getVersion() {
+  try {
+    const response = await axiosInstance.get('/api/version');
+    console.log('Version:', response.data.version);
+    return response.data.version;
+  } catch (error) {
+    console.error('Error fetching version:', error.message);
+  }
+}
+
+// 记录用户请求
+async function recordUserRequest(userId) {
+  try {
+    const response = await axiosInstance.post('/api/record',
+      { userId: userId },
+      {
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+    console.log('Record response:', response.data);
+  } catch (error) {
+    console.error('Error recording user request:', error.message);
+  }
+}
+
+// 生成唯一的电脑用户ID
+async function generateUniqueUserId() {
+    try {
+      const [cpu, system, osInfo, uuid] = await Promise.all([
+        si.cpu(),
+        si.system(),
+        si.osInfo(),
+        si.uuid()
+      ]);
+  
+      const hardwareInfo = {
+        cpuId: cpu.processor_id || '',
+        systemUuid: system.uuid || '',
+        systemModel: system.model || '',
+        osUuid: osInfo.uuid || '',
+        machineUuid: uuid.hardware || ''
+      };
+  
+      const combinedInfo = Object.values(hardwareInfo).join('-');
+      const hash = crypto.createHash('sha256');
+      hash.update(combinedInfo);
+      return hash.digest('hex');
+    } catch (error) {
+      console.error('Error generating unique user ID:', error);
+      return 'unknown-' + Date.now();
+    }
+  }
+  
+
 async function initializeBrowser() {
     try {
         browser = await puppeteer.launch({
@@ -63,6 +137,21 @@ async function initializeBrowser() {
         }
         // 设置cookie
         await page.setCookie(...getSessionCookie(config.cookie));
+
+        let version =await getVersion();
+        console.log(version);
+
+        if(banbenhao== version){
+
+            console.log("最新版本无需更新");
+
+        }else{
+
+            console.log("拥有新版本,请进行更新！");
+        }
+
+        userId=await generateUniqueUserId();
+
         await page.goto('https://monica.im/home', { waitUntil: 'networkidle0' });
         console.log('Successfully opened https://monica.im/home');
         // 检查是否成功登录
@@ -80,6 +169,7 @@ async function initializeBrowser() {
             console.log(`Element with class "'.monica-btn--TH1fg'" not found`);
             console.log('欢迎使用Monica反代，成功启动！By从前跟你一样');
         }
+
     } catch (error) {
         console.error('An error occurred during browser initialization:', error);
     }
@@ -322,6 +412,8 @@ async function sendMessage(res3, message) {
         //   });
         // 发送消息
              // 设置请求拦截
+
+        
         await setupRequestInterception(page, res3, () => isResponseEnded = true);
         await clickElement('.input-msg-btn--yXWjh', page);
         if (Aborted) {
@@ -330,6 +422,7 @@ async function sendMessage(res3, message) {
             customEventSource.close();
             return false;
         }
+        recordUserRequest(userId);
 
     } catch (error) {
         console.error('Error in sendMessage:', error);
