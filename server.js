@@ -14,6 +14,7 @@ import EventSource from'eventsource';
 import HttpsProxyAgent from 'https-proxy-agent';
 import puppeteer from'puppeteer';
 
+
 // 使用 createRequire 来导入 JSON 文件
 const require = createRequire(import.meta.url);
 const config = require('./config.json');
@@ -23,6 +24,7 @@ const wss = new WebSocketServer({ server });
 let requestId = null;
 let resssss = null;
 let Aborted=false;
+let Message;
 // 设置本地代理
 const proxyUrl = config.proxyUrl;
 const proxyAgent = new HttpsProxyAgent(proxyUrl);
@@ -124,7 +126,7 @@ app.post('/v1/chat/completions', async (req, res) => {
         if(rrreeeqqq){
         rrreeeqqq.abort();
         resssss=null;
-    }
+        }
     });
 
     res.writeHead(200, {
@@ -234,12 +236,29 @@ async function sendMessage(res3, message) {
     let isResponseEnded = false;
     try {
         message = message.messages;
-        message = JSON.stringify(message);
+        message = simplifyJsonString(message)
+        function simplifyJsonString(message) {
+            try {
+              
+              // 将每个消息转换为简化的文本格式
+              let simplifiedMessages = message.map(msg => {
+                return `${msg.role}: ${msg.content}`;
+              });
+              
+              // 将所有简化的消息用换行符连接
+              return simplifiedMessages.join('\n');
+            } catch (error) {
+              console.error("Error parsing JSON:", error);
+              return "Error: Invalid JSON string";
+            }
+          }
+          
         console.log('Formatted messages:', message);
-        const txtname= Math.random().toString(36).substring(3);
-        const localCopyPath = path.join(__dirname, `${txtname+".txt"}`);
-        fs.writeFileSync(localCopyPath, message);
-        console.log(`Local copy of formatted messages saved to: ${localCopyPath}`);
+        //const txtname= Math.random().toString(36).substring(3);
+       // const localCopyPath = path.join(__dirname, `${txtname+".txt"}`);
+        //  fs.writeFileSync(localCopyPath, message);
+        Message = message;
+       // console.log(`Local copy of formatted messages saved to: ${localCopyPath}`);
 
         // 重置页面状态（可选，视情况而定）
       // await page.reload({ waitUntil: 'networkidle0' });
@@ -272,7 +291,14 @@ async function sendMessage(res3, message) {
             return false;
         }
         // 上传文件
-        await uploadFile('.file-uploader--Aiixn', localCopyPath, page);
+       // await uploadFile('.file-uploader--Aiixn', localCopyPath, page);
+       //输入文本
+       await page.evaluate((selector, text) => {
+        document.querySelector(selector).value = text;
+        }, '.textarea-primary--YyFEP', Message); 
+       await new Promise(resolve => setTimeout(resolve, 900));
+       await page.type('.textarea-primary--YyFEP', ".", {delay: 0});
+
         if (Aborted) {
             console.log('guanbi!!!!');
             rrreeeqqq.abort();
@@ -287,14 +313,16 @@ async function sendMessage(res3, message) {
             return false;
         }
         //删除文件
-        fs.unlink(localCopyPath, (err) => {
-            if (err) {
-              console.error('删除文件时出错:', err);
-              return;
-            }
-            console.log('文件已成功删除');
-          });
+        // fs.unlink(localCopyPath, (err) => {
+        //     if (err) {
+        //       console.error('删除文件时出错:', err);
+        //       return;
+        //     }
+        //     console.log('文件已成功删除');
+        //   });
         // 发送消息
+             // 设置请求拦截
+        await setupRequestInterception(page, res3, () => isResponseEnded = true);
         await clickElement('.input-msg-btn--yXWjh', page);
         if (Aborted) {
             console.log('guanbi!!!!');
@@ -302,8 +330,6 @@ async function sendMessage(res3, message) {
             customEventSource.close();
             return false;
         }
-        // 设置请求拦截
-        await setupRequestInterception(page, res3, () => isResponseEnded = true);
 
     } catch (error) {
         console.error('Error in sendMessage:', error);
@@ -437,8 +463,6 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
         if (request.isHandled) return;
         request.isHandled = true;
 
-
-
         if (request.url().includes('/custom_bot/chat')) {
             const newRequest = {
                 ...request,
@@ -537,6 +561,12 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                                     }
                                 } catch (error) {
                                     console.error('Error processing message:', error);
+                                    console.log('Client disconnected');
+                                    Aborted = true;
+                                    if(rrreeeqqq){
+                                    rrreeeqqq.abort();
+                                    resssss=null;
+                                    }
                                 }
                             }
                         }
@@ -548,15 +578,21 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                                 customEventSource.close();
                             }
                             rrreeeqqq.abort();
+                            if(resssss){
                                 resssss.write(`data: [DONE]\n\n`);
                                 resssss.end();
-                                
+                             } 
                             console.log('Response ended and resources cleaned up');
                         }
 
                     } catch (error) {
                         console.error('Error intercepting request:', error);
-                        cleanupAndEnd('Error occurred');
+                        console.log('Client disconnected');
+                        Aborted = true;
+                        if(rrreeeqqq){
+                        rrreeeqqq.abort();
+                        resssss=null;
+                        }
                     }
                    
         
