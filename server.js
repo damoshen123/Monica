@@ -18,7 +18,7 @@ import si from 'systeminformation';
 import crypto from 'crypto';
 
 //版本号
-const banbenhao = "1.0";
+const banbenhao = "1.1";
 
 
 // 使用 createRequire 来导入 JSON 文件
@@ -50,7 +50,8 @@ let page = null;
 let customEventSource;
 let  isRestarting;
 let  rrreeeqqq;
-
+let reqmessage="";
+let isstream=false;
 // Worker 的基础 URL
 const baseUrl = 'https://tongji.damoshenworkersdev.workers.dev';
 
@@ -205,6 +206,7 @@ const availableModels = [
 
 app.post('/v1/chat/completions', async (req, res) => {
     console.log('Received chat request');
+    reqmessage="";
     if(resssss==null){
         resssss = res;
     }
@@ -219,11 +221,21 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
     });
 
-    res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-    });
+        let body=req.body
+  
+    if(!body.hasOwnProperty('stream')||!body["stream"]){
+
+
+        isstream=false;
+    }else{
+        isstream=true;
+    }
+    res.setHeader("Content-Type", "text/event-stream;charset=utf-8");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    req.setEncoding("utf8");
+
+    console.log("isstream",isstream)
+
     console.log('Received chat request:', req.body);
     await sendMessage(res, req.body);
 });
@@ -373,7 +385,7 @@ async function sendMessage(res3, message) {
         }
 
        // await clickElement('.chat-toolbar-item--at7NB', page);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         if (Aborted) {
             console.log('guanbi!!!!');
             rrreeeqqq.abort();
@@ -395,7 +407,7 @@ async function sendMessage(res3, message) {
             customEventSource.close();
             return false;
         }
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         if (Aborted) {
             console.log('guanbi!!!!');
             rrreeeqqq.abort();
@@ -577,9 +589,6 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                                 timeout: 30000
                             });
                         }
-
-
-
                         customEventSource.on('message', (event) => {
                             if (Aborted) {
                                 console.log('guanbi!!!!');
@@ -648,8 +657,12 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                                     };
                                     if(resssss){
                                         console.log('Sending response:', JSON.stringify(response));
-                                        resssss.write(`data: ${JSON.stringify(response).replace("\\n","\\n ")}\n\n`);
-                                    }else{
+                                        if(isstream){
+                                            reqmessage+=text;
+                                            resssss.write(`data: ${JSON.stringify(response).replace("\\n","\\n ")}\n\n`);
+                                            }else{
+                                               reqmessage+=text;
+                                            }                                   }else{
                                         return;
                                     }
                                 } catch (error) {
@@ -672,9 +685,25 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                             }
                             rrreeeqqq.abort();
                             if(resssss){
+                               if(isstream){
+                                if(!reqmessage==""){
                                 resssss.write(`data: [DONE]\n\n`);
                                 resssss.end();
-                             } 
+                                }else{
+                                    resssss.write('{"error":{"message":"网络错误","type":"invalid_request_error","param":null,"code":null}}');
+                                    resssss.end();
+                                }
+                            }else{
+                                if(!reqmessage==""){
+                                const response= createChatCompletion(reqmessage)
+                                resssss.write(JSON.stringify(response));
+                                resssss.end();
+                                }else{
+                                    resssss.write('{"error":{"message":"网络错误","type":"invalid_request_error","param":null,"code":null}}');
+                                    resssss.end();
+                                }
+                            }
+                             }
                             console.log('Response ended and resources cleaned up');
                         }
 
@@ -703,3 +732,31 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
 server.listen(config.port, () => {
     console.log(`服务器运行在 http://localhost:${config.port}`);
 });
+function createChatCompletion(content){
+    const completionTokens = content.length;
+    
+    return {
+        id: generateId(),
+        object: "chat.completion",
+        created: Math.floor(Date.now() / 1000),
+        model: "gpt-3.5-turbo",
+        system_fingerprint: "fp_44709d6fcb",
+        choices: [
+            {
+                index: 0,
+                message: {
+                    role: "assistant",
+                    content: content
+                },
+                logprobs: null,
+                finish_reason: "stop"
+            }
+        ],
+        usage: {
+            prompt_tokens: completionTokens,
+            completion_tokens: completionTokens,
+            total_tokens: completionTokens
+        }
+    };
+};
+const generateId = () => 'chatcmpl-' + Math.random().toString(36).substring(2, 15);
