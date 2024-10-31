@@ -18,7 +18,7 @@ import si from 'systeminformation';
 import crypto from 'crypto';
 
 //版本号
-const banbenhao = "1.1";
+const banbenhao = "1.2";
 
 
 // 使用 createRequire 来导入 JSON 文件
@@ -121,10 +121,10 @@ async function initializeBrowser() {
     try {
         browser = await puppeteer.launch({
             headless: config.wutou,
-            args: ['--window-size=800,600'],
+            args: ['--window-size=1024,960'],
             defaultViewport: {
-                width: 800,
-                height: 600
+                width: 1024,
+                height: 1024
             }
         });
         page = await browser.newPage();
@@ -132,17 +132,22 @@ async function initializeBrowser() {
             console.log("cookieString", cookieString)
             var sessionCookie = cookieString.split('; ').map(pair => {
                 const [name, value] = pair.split('=');
-                return { name, value, domain: 'monica.im', path: '/' };
+                return { name, value, domain: '.monica.im', path: '/' };
             });
             return sessionCookie;
         }
         // 设置cookie
-        await page.setCookie(...getSessionCookie(config.cookie));
+
+
+        const sessionCookie=getSessionCookie(config.cookie)
+        console.log("sessionCookie",sessionCookie);
+
+        await page.setCookie(...sessionCookie);
 
         let version =await getVersion();
         console.log(version);
 
-        if(banbenhao== version){
+        if(banbenhao == version){
 
             console.log("最新版本无需更新");
 
@@ -152,9 +157,9 @@ async function initializeBrowser() {
         }
 
         userId=await generateUniqueUserId();
+        await page.goto('https://monica.im', { waitUntil: 'networkidle0' });
+        console.log('Successfully opened https://monica.im');
 
-        await page.goto('https://monica.im/home', { waitUntil: 'networkidle0' });
-        console.log('Successfully opened https://monica.im/home');
         // 检查是否成功登录
         const isLoggedIn = await page.evaluate(() => {
             return document.querySelector('.icon--SJP_d') !== null;
@@ -280,7 +285,7 @@ class CustomEventSource extends EventEmitter {
                 ...this.options.headers
             },
             agent: this.options.agent,
-            timeout: this.options.timeout || 0
+            timeout: 3000//this.options.timeout || 0
         };
 
         const client = this.url.protocol === 'https:' ? https : http;
@@ -395,11 +400,26 @@ async function sendMessage(res3, message) {
         // 上传文件
        // await uploadFile('.file-uploader--Aiixn', localCopyPath, page);
        //输入文本
-       await page.evaluate((selector, text) => {
+      // 输入文本
+      await page.evaluate((selector, text) => {
         document.querySelector(selector).value = text;
         }, '.textarea-primary--YyFEP', Message); 
-       await new Promise(resolve => setTimeout(resolve, 900));
+       await new Promise(resolve => setTimeout(resolve, 1000));
        await page.type('.textarea-primary--YyFEP', ".", {delay: 0});
+
+        // 验证输入
+        const inputValue = await page.evaluate(selector => {
+            return document.querySelector(selector).value;
+        }, '.textarea-primary--YyFEP');
+
+        // 如果输入不成功，继续
+        if (!inputValue || inputValue !== Message+".") {
+            await page.evaluate((selector, text) => {
+                document.querySelector(selector).value = text;
+                }, '.textarea-primary--YyFEP', Message); 
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await page.type('.textarea-primary--YyFEP', ".", {delay: 0});
+}
 
         if (Aborted) {
             console.log('guanbi!!!!');
@@ -564,11 +584,30 @@ function getFileType(fileName) {
 async function setupRequestInterception(page, res4, setResponseEnded) {
     await page.setRequestInterception(true);
 
+
+
     page.on('request', async (request) => {
         if (request.isHandled) return;
         request.isHandled = true;
 
-        if (request.url().includes('/custom_bot/chat')) {
+        if (request.url().includes('/api/custom_bot/chat')) {
+
+
+
+                        // 处理 OPTIONS 预检请求
+                        if (request.method() === 'OPTIONS') {
+                            await request.respond({
+                                status: 200,
+                                headers: {
+                                    'Access-Control-Allow-Origin': 'https://monica.im',
+                                    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+                                    'Access-Control-Allow-Headers': 'content-type,x-client-id,x-client-locale,x-client-type,x-client-version,x-from-channel,x-product-name,x-time-zone',
+                                    'Access-Control-Max-Age': '86400',
+                                    'Access-Control-Allow-Credentials': 'true'
+                                }
+                            });
+                            return;
+                        }
             const newRequest = {
                 ...request,
                 continue: async (overrides) => {
@@ -633,7 +672,6 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                                 try {
                                     const parsedMessage = JSON.parse(message);
                                     const text = parsedMessage.text;
-
                                     const response = {
                                         id: "chatcmpl-" + Math.random().toString(36).substr(2, 9),
                                         object: "chat.completion",
@@ -676,7 +714,6 @@ async function setupRequestInterception(page, res4, setResponseEnded) {
                                 }
                             }
                         }
-
                         function cleanupAndEnd(reason) {
                             console.log(`Ending response: ${reason}`);
                             if (customEventSource) {
