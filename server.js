@@ -18,7 +18,7 @@ import si from 'systeminformation';
 import crypto from 'crypto';
 
 //版本号
-const banbenhao = "1.2";
+const banbenhao = "1.3";
 
 
 // 使用 createRequire 来导入 JSON 文件
@@ -349,7 +349,14 @@ async function sendMessage(res3, message) {
               
               // 将每个消息转换为简化的文本格式
               let simplifiedMessages = message.map(msg => {
-                return `${msg.role}: ${msg.content}`;
+               
+                if(config.tohuman){
+                      
+                    return `${msg.role.replace("user","human")}: ${msg.content}`;
+                }else{
+
+                    return `${msg.role}: ${msg.content}`;
+                }
               });
               
               // 将所有简化的消息用换行符连接
@@ -383,7 +390,7 @@ async function sendMessage(res3, message) {
         }
         const newmasg = await page.$$('.chat-toolbar-item--at7NB');
         if (newmasg) {
-            await newmasg[4].click();
+            await newmasg[5].click();
             console.log('Successfully clicked the element with class "chat-toolbar-item--at7NB"');
         } else {
             console.log('Element with class "chat-toolbar-item--at7NB" not found');
