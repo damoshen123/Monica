@@ -12,15 +12,18 @@ import os from 'os';
 import { createRequire } from 'module';
 import EventSource from'eventsource';
 import HttpsProxyAgent from 'https-proxy-agent';
-import puppeteer from'puppeteer';
 import axios from 'axios';
 import si from 'systeminformation';
 import crypto from 'crypto';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { chromium } from 'playwright';
 
 //版本号
 const banbenhao = "1.3";
-
-
+const execAsync = promisify(exec);
+const CHROME_PATH = path.join(process.cwd(), 'chrome-linux'); // 假设解压到当前目录的 chromium 文件夹
+const CHROME_EXECUTABLE = path.join(CHROME_PATH, 'chrome'); // 或 'chrome-linux/chrome'
 // 使用 createRequire 来导入 JSON 文件
 
 const require = createRequire(import.meta.url);
@@ -47,6 +50,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 let browser = null;
 let page = null;
+let context=null;
 let customEventSource;
 let  isRestarting;
 let  rrreeeqqq;
@@ -119,15 +123,55 @@ async function generateUniqueUserId() {
 
 async function initializeBrowser() {
     try {
-        browser = await puppeteer.launch({
-            headless: config.wutou,
-            args: ['--window-size=1024,960'],
-            defaultViewport: {
+        // browser = await puppeteer.launch({
+        //     headless: config.wutou,
+        //     args: ['--window-size=1024,960'],
+        //     defaultViewport: {
+        //         width: 1024,
+        //         height: 1024
+        //     }
+        // });
+        browser = await chromium.launch({
+            // 使用系统 Chromium
+            executablePath: '/usr/bin/chromium',
+            
+            // 启动参数
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage'
+            ],
+                        defaultViewport: {
                 width: 1024,
                 height: 1024
-            }
+            },
+            
+            headless: false  // 无头模式
         });
-        page = await browser.newPage();
+
+        // 创建上下文
+        context = await browser.newContext({
+            viewport: { width: 1920, height: 1080 }
+        });
+
+        // 创建页面
+       page = await context.newPage();
+        console.log("启动浏览器完成");
+        // 添加全局错误处理
+        process.on('uncaughtException', (error) => {
+            console.error('未捕获的异常:', error);
+            process.exit(1);
+        });
+        
+        process.on('unhandledRejection', (error) => {
+            console.error('未处理的 Promise 拒绝:', error);
+            process.exit(1);
+        });
+
+        
+      //  page = await browser.newPage();
+
+        //console.log("启动浏览器完成");
         function getSessionCookie(cookieString) {
             console.log("cookieString", cookieString)
             var sessionCookie = cookieString.split('; ').map(pair => {
@@ -140,9 +184,16 @@ async function initializeBrowser() {
 
 
         const sessionCookie=getSessionCookie(config.cookie)
+
+
+                // 设置 cookie
+
+
+        await context.addCookies(sessionCookie);
+
         console.log("sessionCookie",sessionCookie);
 
-        await page.setCookie(...sessionCookie);
+       // await page.setCookie(...sessionCookie);
 
         let version =await getVersion();
         console.log(version);
@@ -161,14 +212,16 @@ async function initializeBrowser() {
         console.log('Successfully opened https://monica.im');
 
         // 检查是否成功登录
-        const isLoggedIn = await page.evaluate(() => {
-            return document.querySelector('.icon--SJP_d') !== null;
-        });
-        console.log('Login status:', isLoggedIn);
+        try {
+            const isLoggedIn = await page.locator('.icon--SJP_d').count() > 0;
+            console.log('Login status:', isLoggedIn);
+        } catch (error) {
+            console.log('Login check failed:', error.message);
+        }
         
-        const element = await page.$('.monica-btn--TH1fg');
-        if (element) {
-            await element.click();
+        const button = page.locator('.monica-btn--TH1fg');
+        if (await button.count() > 0) {
+            await button.click();
             console.log(`Successfully clicked the element with class '.monica-btn--TH1fg"`);
             console.log('欢迎使用Monica反代，成功启动！By从前跟你一样');
         } else {
@@ -368,33 +421,18 @@ async function sendMessage(res3, message) {
           }
           
         console.log('Formatted messages:', message);
-        //const txtname= Math.random().toString(36).substring(3);
-       // const localCopyPath = path.join(__dirname, `${txtname+".txt"}`);
-        //  fs.writeFileSync(localCopyPath, message);
         Message = message;
-       // console.log(`Local copy of formatted messages saved to: ${localCopyPath}`);
-
-        // 重置页面状态（可选，视情况而定）
-      // await page.reload({ waitUntil: 'networkidle0' });
-
-        // 在适当的地方检查是否已中止
-
-
         // 等待并点击所需元素
-        await page.waitForSelector('.chat-toolbar-item--at7NB', { timeout: 10000 });
+      //  await page.waitForSelector('.chat-toolbar-item--at7NB', { timeout: 10000 });
         if (Aborted) {
             console.log('guanbi!!!!');
             rrreeeqqq.abort();
             customEventSource.close();
             return false;
         }
-        const newmasg = await page.$$('.chat-toolbar-item--at7NB');
-        if (newmasg) {
-            await newmasg[5].click();
-            console.log('Successfully clicked the element with class "chat-toolbar-item--at7NB"');
-        } else {
-            console.log('Element with class "chat-toolbar-item--at7NB" not found');
-        }
+        const newMsgButton = await page.locator('.chat-toolbar-item--at7NB').nth(5);
+        console.log('Successfully clicked the element with class "chat-toolbar-item--at7NB"');
+        await newMsgButton.click();
 
        // await clickElement('.chat-toolbar-item--at7NB', page);
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -404,29 +442,23 @@ async function sendMessage(res3, message) {
             customEventSource.close();
             return false;
         }
-        // 上传文件
-       // await uploadFile('.file-uploader--Aiixn', localCopyPath, page);
-       //输入文本
-      // 输入文本
-      await page.evaluate((selector, text) => {
-        document.querySelector(selector).value = text;
-        }, '.textarea-primary--YyFEP', Message); 
-       await new Promise(resolve => setTimeout(resolve, 1000));
-       await page.type('.textarea-primary--YyFEP', ".", {delay: 0});
 
+    //   await page.evaluate((selector, text) => {
+    //     document.querySelector(selector).value = text;
+    //     }, '.textarea-primary--YyFEP', Message); 
+    //    await new Promise(resolve => setTimeout(resolve, 1000));
+    //    await page.type('.textarea-primary--YyFEP', ".", {delay: 0});
+        // 输入消息
+        const textarea = await page.locator('.textarea-primary--YyFEP');
+        await textarea.fill(Message);
+        await textarea.type('.');
         // 验证输入
-        const inputValue = await page.evaluate(selector => {
-            return document.querySelector(selector).value;
-        }, '.textarea-primary--YyFEP');
+        const inputValue = await textarea.inputValue();
+        if (!inputValue || inputValue !== Message + ".") {
+            await textarea.fill(Message);
+            await textarea.type('.');
+        }
 
-        // 如果输入不成功，继续
-        if (!inputValue || inputValue !== Message+".") {
-            await page.evaluate((selector, text) => {
-                document.querySelector(selector).value = text;
-                }, '.textarea-primary--YyFEP', Message); 
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            await page.type('.textarea-primary--YyFEP', ".", {delay: 0});
-}
 
         if (Aborted) {
             console.log('guanbi!!!!');
@@ -441,20 +473,9 @@ async function sendMessage(res3, message) {
             customEventSource.close();
             return false;
         }
-        //删除文件
-        // fs.unlink(localCopyPath, (err) => {
-        //     if (err) {
-        //       console.error('删除文件时出错:', err);
-        //       return;
-        //     }
-        //     console.log('文件已成功删除');
-        //   });
-        // 发送消息
-             // 设置请求拦截
-
-        
         await setupRequestInterception(page, res3, () => isResponseEnded = true);
-        await clickElement('.input-msg-btn--yXWjh', page);
+         // 发送消息
+         await page.locator('.input-msg-btn--yXWjh').click();
         if (Aborted) {
             console.log('guanbi!!!!');
             rrreeeqqq.abort();
@@ -589,189 +610,177 @@ function getFileType(fileName) {
  }
 
 async function setupRequestInterception(page, res4, setResponseEnded) {
-    await page.setRequestInterception(true);
-
-
-
-    page.on('request', async (request) => {
-        if (request.isHandled) return;
-        request.isHandled = true;
-
-        if (request.url().includes('/api/custom_bot/chat')) {
-
-
-
-                        // 处理 OPTIONS 预检请求
-                        if (request.method() === 'OPTIONS') {
-                            await request.respond({
-                                status: 200,
-                                headers: {
-                                    'Access-Control-Allow-Origin': 'https://monica.im',
-                                    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-                                    'Access-Control-Allow-Headers': 'content-type,x-client-id,x-client-locale,x-client-type,x-client-version,x-from-channel,x-product-name,x-time-zone',
-                                    'Access-Control-Max-Age': '86400',
-                                    'Access-Control-Allow-Credentials': 'true'
-                                }
-                            });
-                            return;
+        // Playwright 使用 route 而不是 setRequestInterception
+        await page.route('**/*', async (route) => {
+            const request = route.request();
+            const url = request.url();
+            
+            if (url.includes('/api/custom_bot/chat')) {
+                // 处理 OPTIONS 预检请求
+                if (request.method() === 'OPTIONS') {
+                    await route.fulfill({
+                        status: 200,
+                        headers: {
+                            'Access-Control-Allow-Origin': 'https://monica.im',
+                            'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+                            'Access-Control-Allow-Headers': 'content-type,x-client-id,x-client-locale,x-client-type,x-client-version,x-from-channel,x-product-name,x-time-zone',
+                            'Access-Control-Max-Age': '86400',
+                            'Access-Control-Allow-Credentials': 'true'
                         }
-            const newRequest = {
-                ...request,
-                continue: async (overrides) => {
-                    try {
-                        if(config.proxy){
-                            customEventSource  = new CustomEventSource(request.url(), {
-                                method: request.method(),
-                                headers: request.headers(),
-                                body: request.postData(),
-                                agent: proxyAgent,
-                                timeout: 30000
-                            });
-                        }else{
-                            customEventSource  = new CustomEventSource(request.url(), {
-                                method: request.method(),
-                                headers: request.headers(),
-                                body: request.postData(),
-                                timeout: 30000
-                            });
-                        }
-                        customEventSource.on('message', (event) => {
-                            if (Aborted) {
-                                console.log('guanbi!!!!');
-                                rrreeeqqq.abort();
-                                customEventSource.close();
-                                return false;
-                            }
-                            console.log('Received data:', event.data);
-                            processStreamData(event.data);
-                        });
-
-                        customEventSource.on('error', (error) => {
-                            console.error('EventSource error:', error);
-                            cleanupAndEnd('Error occurred');
-                        });
-
-                        customEventSource.on('end', (message) => {
-                            console.log('Stream ended:', message);
-                            cleanupAndEnd('Stream ended');
-                        });
-
-                        customEventSource.on('close', (message) => {
-                            console.log('Connection closed:', message);
-                            cleanupAndEnd('Connection closed');
-                        });
-
-                        function processStreamData(message) {
-                            if (Aborted) {
-                                console.log('Request aborted, stopping data processing');
-                                rrreeeqqq.abort();
-                                return;
-                            }
-
-                            console.log('数据', message);
-                            if (message == `{"text":"","finished":true}`) {
-                                cleanupAndEnd('Finished');
-                                customEventSource.close();
-                                return;
-                            }
-
-                            if (!(message == `{"text":"","extra_flags":{"free_quota_empty":true}}`)) {
-                                try {
-                                    const parsedMessage = JSON.parse(message);
-                                    const text = parsedMessage.text;
-                                    const response = {
-                                        id: "chatcmpl-" + Math.random().toString(36).substr(2, 9),
-                                        object: "chat.completion",
-                                        created: Date.now(),
-                                        model: "gpt-3.5-turbo-0613",
-                                        usage: {
-                                            prompt_tokens: 9,
-                                            completion_tokens: text.length,
-                                            total_tokens: 9 + text.length
-                                        },
-                                        choices: [
-                                            {
-                                                delta: {
-                                                    role: 'assistant',
-                                                    content: text || null
-                                                },
-                                                finish_reason: null,
-                                                index: 0
-                                            }
-                                        ]
-                                    };
-                                    if(resssss){
-                                        console.log('Sending response:', JSON.stringify(response));
-                                        if(isstream){
-                                            reqmessage+=text;
-                                            resssss.write(`data: ${JSON.stringify(response).replace("\\n","\\n ")}\n\n`);
-                                            }else{
-                                               reqmessage+=text;
-                                            }                                   }else{
-                                        return;
-                                    }
-                                } catch (error) {
-                                    console.error('Error processing message:', error);
-                                    console.log('Client disconnected');
-                                    Aborted = true;
-                                    if(rrreeeqqq){
-                                    rrreeeqqq.abort();
-                                    resssss=null;
-                                    }
-                                }
-                            }
-                        }
-                        function cleanupAndEnd(reason) {
-                            console.log(`Ending response: ${reason}`);
-                            if (customEventSource) {
-                                customEventSource.removeAllListeners();
-                                customEventSource.close();
-                            }
+                    });
+                    return;
+                }
+    
+                try {
+                    // 创建 EventSource 实例
+                    const eventSourceOptions = {
+                        method: request.method(),
+                        headers: await request.allHeaders(),
+                        body: request.postData(),
+                        timeout: 30000
+                    };
+    
+                    if (config.proxy) {
+                        eventSourceOptions.agent = proxyAgent;
+                    }
+    
+                    customEventSource = new CustomEventSource(url, eventSourceOptions);
+    
+                    customEventSource.on('message', (event) => {
+                        if (Aborted) {
+                            console.log('关闭连接!');
                             rrreeeqqq.abort();
-                            if(resssss){
-                               if(isstream){
-                                if(!reqmessage==""){
-                                resssss.write(`data: [DONE]\n\n`);
-                                resssss.end();
-                                }else{
-                                    resssss.write('{"error":{"message":"网络错误","type":"invalid_request_error","param":null,"code":null}}');
-                                    resssss.end();
-                                }
-                            }else{
-                                if(!reqmessage==""){
-                                const response= createChatCompletion(reqmessage)
-                                resssss.write(JSON.stringify(response));
-                                resssss.end();
-                                }else{
-                                    resssss.write('{"error":{"message":"网络错误","type":"invalid_request_error","param":null,"code":null}}');
-                                    resssss.end();
-                                }
-                            }
-                             }
-                            console.log('Response ended and resources cleaned up');
+                            customEventSource.close();
+                            return false;
                         }
-
-                    } catch (error) {
-                        console.error('Error intercepting request:', error);
-                        console.log('Client disconnected');
-                        Aborted = true;
-                        if(rrreeeqqq){
+                        console.log('Received data:', event.data);
+                        processStreamData(event.data);
+                    });
+    
+                    customEventSource.on('error', (error) => {
+                        console.error('EventSource error:', error);
+                        cleanupAndEnd('Error occurred');
+                    });
+    
+                    customEventSource.on('end', (message) => {
+                        console.log('Stream ended:', message);
+                        cleanupAndEnd('Stream ended');
+                    });
+    
+                    customEventSource.on('close', (message) => {
+                        console.log('Connection closed:', message);
+                        cleanupAndEnd('Connection closed');
+                    });
+    
+                    // 继续请求
+                    await route.continue();
+    
+                } catch (error) {
+                    console.error('Error intercepting request:', error);
+                    console.log('Client disconnected');
+                    Aborted = true;
+                    if (rrreeeqqq) {
                         rrreeeqqq.abort();
-                        resssss=null;
+                        resssss = null;
+                    }
+                    await route.continue();
+                }
+            } else {
+                // 对于其他请求，直接继续
+                await route.continue();
+            }
+        });
+    
+        function processStreamData(message) {
+            if (Aborted) {
+                console.log('Request aborted, stopping data processing');
+                rrreeeqqq.abort();
+                return;
+            }
+    
+            console.log('数据', message);
+            if (message === `{"text":"","finished":true}`) {
+                cleanupAndEnd('Finished');
+                customEventSource.close();
+                return;
+            }
+    
+            if (message !== `{"text":"","extra_flags":{"free_quota_empty":true}}`) {
+                try {
+                    const parsedMessage = JSON.parse(message);
+                    const text = parsedMessage.text;
+                    const response = {
+                        id: "chatcmpl-" + Math.random().toString(36).substr(2, 9),
+                        object: "chat.completion",
+                        created: Date.now(),
+                        model: "gpt-3.5-turbo-0613",
+                        usage: {
+                            prompt_tokens: 9,
+                            completion_tokens: text.length,
+                            total_tokens: 9 + text.length
+                        },
+                        choices: [{
+                            delta: {
+                                role: 'assistant',
+                                content: text || null
+                            },
+                            finish_reason: null,
+                            index: 0
+                        }]
+                    };
+    
+                    if (resssss) {
+                        console.log('Sending response:', JSON.stringify(response));
+                        if (isstream) {
+                            reqmessage += text;
+                            resssss.write(`data: ${JSON.stringify(response).replace("\\n", "\\n ")}\n\n`);
+                        } else {
+                            reqmessage += text;
                         }
                     }
-                   
-        
-                },
-                
-            };
-
-            await newRequest.continue();
-        } else {
-            await request.continue();
+                } catch (error) {
+                    console.error('Error processing message:', error);
+                    console.log('Client disconnected');
+                    Aborted = true;
+                    if (rrreeeqqq) {
+                        rrreeeqqq.abort();
+                        resssss = null;
+                    }
+                }
+            }
         }
-    });
-}
+    
+        function cleanupAndEnd(reason) {
+            console.log(`Ending response: ${reason}`);
+            if (customEventSource) {
+                customEventSource.removeAllListeners();
+                customEventSource.close();
+            }
+            rrreeeqqq.abort();
+            if (resssss) {
+                if (isstream) {
+                    if (reqmessage !== "") {
+                        resssss.write(`data: [DONE]\n\n`);
+                        resssss.end();
+                    } else {
+                        resssss.write('{"error":{"message":"网络错误","type":"invalid_request_error","param":null,"code":null}}');
+                        resssss.end();
+                    }
+                } else {
+                    if (reqmessage !== "") {
+                        const response = createChatCompletion(reqmessage);
+                        resssss.write(JSON.stringify(response));
+                        resssss.end();
+                    } else {
+                        resssss.write('{"error":{"message":"网络错误","type":"invalid_request_error","param":null,"code":null}}');
+                        resssss.end();
+                    }
+                }
+            }
+            console.log('Response ended and resources cleaned up');
+        }
+    }
+    
 
 server.listen(config.port, () => {
     console.log(`服务器运行在 http://localhost:${config.port}`);
