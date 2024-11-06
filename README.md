@@ -1,10 +1,10 @@
 # Node.js中转站服务器
 
-这是一个用于Monica代理的Node.js中转站服务器，专为Windows环境设计。在安装了桌面环境的linux 也能运行
+这是一个用于Monica代理  专为安卓手机  aidlux 的 linux环境设计。
 
 ## 快速开始
 
-1. 确保您的系统已安装Node.js和npm。如果没有，请从[Node.js官网](https://nodejs.org)下载并安装。
+1. 确保您的手机已安装aidlux 软件
 
 2. 下载或克隆此仓库到您的本地机器。
 
@@ -19,6 +19,6 @@
 
 可以按 f12 在网页的控制台中 输入 console.log(document.cookie);  来获取
 
-## 投喂咖啡
+## 头发换的代码不易，欢迎投喂咖啡
 
 https://afdian.com/a/cqgnyy
