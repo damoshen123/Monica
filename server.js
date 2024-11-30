@@ -16,9 +16,110 @@ import crypto from 'crypto';
 import { chromium } from '@playwright/test';
 
 //版本号
-const banbenhao = "1.4";
+const banbenhao = "1.5";
 
+class MemoryMonitor {
+    constructor(page) {
+        this.page = page;
+        this.warningThreshold = 200 * 1024 * 1024;  // 400MB 警告阈值
+        this.criticalThreshold = 400 * 1024 * 1024; // 500MB 临界阈值
+    }
 
+    async checkMemory() {
+        try {
+            const metrics = await this.page.evaluate(() => {
+                if (!performance.memory) return null;
+                return {
+                    usedJSHeapSize: performance.memory.usedJSHeapSize,
+                    totalJSHeapSize: performance.memory.totalJSHeapSize,
+                    jsHeapSizeLimit: performance.memory.jsHeapSizeLimit
+                };
+            });
+
+            if (!metrics) {
+                console.log('Memory metrics not available');
+                return null;
+            }
+
+            // 转换为MB便于阅读
+            const usedMB = Math.round(metrics.usedJSHeapSize / (1024 * 1024));
+            const totalMB = Math.round(metrics.totalJSHeapSize / (1024 * 1024));
+            const limitMB = Math.round(metrics.jsHeapSizeLimit / (1024 * 1024));
+
+            console.log(`Memory Usage: ${usedMB}MB / ${totalMB}MB (Limit: ${limitMB}MB)`);
+
+            // 内存使用超过警告阈值
+            if (metrics.usedJSHeapSize > this.warningThreshold) {
+                console.warn('High memory usage detected!');
+                await this.optimizeMemory();
+            }
+
+            // 内存使用超过临界值
+            if (metrics.usedJSHeapSize > this.criticalThreshold) {
+                console.error('Critical memory usage! Forcing garbage collection...');
+                await this.forceGC();
+            }
+
+            return metrics;
+        } catch (error) {
+            console.error('Error checking memory:', error);
+            return null;
+        }
+    }
+
+    async optimizeMemory() {
+        try {
+            await this.page.evaluate(() => {
+                // 清除控制台
+                console.clear();
+                
+                // 清除未使用的图片
+                const images = document.getElementsByTagName('img');
+                for (let img of images) {
+                    if (!img.isConnected) {
+                        img.src = '';
+                    }
+                }
+
+                // 清除未使用的变量
+                if (window.gc) {
+                    window.gc();
+                }
+            });
+        } catch (error) {
+            console.error('Error optimizing memory:', error);
+        }
+    }
+
+    async forceGC() {
+        try {
+            await this.page.evaluate(() => {
+                if (window.gc) {
+                    window.gc();
+                }
+            });
+        } catch (error) {
+            console.error('Error forcing GC:', error);
+        }
+    }
+}
+
+async function setupMemoryMonitoring(page) {
+    const monitor = new MemoryMonitor(page);
+    
+    // 定期检查内存（每5分钟）
+    setInterval(async () => {
+        await monitor.checkMemory();
+    }, 1 * 60 * 1000);
+
+    // 返回monitor实例以便手动调用
+    return monitor;
+}
+
+// 初始化监控
+let memoryMonitor;
+// 初始化监控
+let memoryMonitor2;
 // 使用 createRequire 来导入 JSON 文件
 
 const require = createRequire(import.meta.url);
@@ -118,14 +219,46 @@ async function initializeBrowser() {
     try {
 
         let viewportSize = { width: 800, height: 600 }; // 可以根据需要调整这些值
-        browser = await chromium.launch({ headless: config.wutou });
+        browser = await chromium.launch({
+            deviceScaleFactor: 1,
+            isMobile: false,
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+            proxy:{
+                "server": "http://127.0.0.1:7890",
+                "bypass": "localhost"
+            },
+            headless: config.wutou });
 
         // 创建上下文
         let  context = await browser.newContext(
-            {viewport: viewportSize
+            {viewport: viewportSize,
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+                extraHTTPHeaders: {
+                    'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+                    'sec-ch-ua-mobile': '?0',
+                    'sec-ch-ua-platform': '"Windows"'
+                  },
+                  bypassCSP: true
         }
             );
         page = await context.newPage();
+        // 初始化脚本
+        await context.addInitScript(() => {
+            // 部分伪装，不完全移除
+            Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined  // 不返回 false，而是 undefined
+            });
+
+            // 模拟真实浏览器特征
+            Object.defineProperty(navigator, 'plugins', {
+            get: () => [
+                { name: 'Chrome PDF Plugin' },
+                { name: 'Chrome PDF Viewer' }
+            ]
+            });
+        });
+
+        memoryMonitor = await setupMemoryMonitoring(page);
         function getSessionCookie(cookieString) {
             console.log("cookieString", cookieString)
             var sessionCookie = cookieString.split('; ').map(pair => {
@@ -283,13 +416,14 @@ class CustomEventSource extends EventEmitter {
         const requestOptions = {
             method: this.options.method || 'GET',
             headers: {
-                'Cache-Control': 'no-cache',
-                'Accept': 'text/event-stream',
+              //  'Cache-Control': 'no-cache',
+              //  'Accept': 'text/event-stream',
                 ...this.options.headers
             },
             agent: this.options.agent,
             timeout: 3000//this.options.timeout || 0
         };
+        console.log("requestOptions",requestOptions)
 
         const client = this.url.protocol === 'https:' ? https : http;
         rrreeeqqq = client.request(this.url, requestOptions, (res2) => {
@@ -355,7 +489,8 @@ async function sendMessage(res3, message) {
                
                 if(config.tohuman){
                       
-                    return `${msg.role.replace("user","human")}: ${msg.content}`;
+                    return `${msg.role.replace("user","Human").replace("assistant","Assistant")}: ${msg.content}`;
+
                 }else{
 
                     return `${msg.role}: ${msg.content}`;
@@ -363,7 +498,7 @@ async function sendMessage(res3, message) {
               });
               
               // 将所有简化的消息用换行符连接
-              return simplifiedMessages.join('\n');
+              return simplifiedMessages.join('\n\n');
             } catch (error) {
               console.error("Error parsing JSON:", error);
               return "Error: Invalid JSON string";
@@ -706,8 +841,10 @@ function getFileType(fileName) {
                     console.log('Sending response:', JSON.stringify(response));
                     if (isstream) {
                         reqmessage += text;
+                        resssss.flushHeaders();
                         resssss.write(`data: ${JSON.stringify(response).replace("\\n", "\\n ")}\n\n`);
                     } else {
+                        resssss.flushHeaders();
                         reqmessage += text;
                     }
                 }
