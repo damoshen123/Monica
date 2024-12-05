@@ -150,6 +150,7 @@ let  isRestarting;
 let  rrreeeqqq;
 let reqmessage="";
 let isstream=false;
+let One=true;
 // Worker 的基础 URL
 const baseUrl = 'https://tongji.damoshenworkersdev.workers.dev';
 
@@ -223,10 +224,6 @@ async function initializeBrowser() {
             deviceScaleFactor: 1,
             isMobile: false,
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-            proxy:{
-                "server": "http://127.0.0.1:7890",
-                "bypass": "localhost"
-            },
             headless: config.wutou });
 
         // 创建上下文
@@ -349,6 +346,7 @@ const availableModels = [
 
 app.post('/v1/chat/completions', async (req, res) => {
     console.log('Received chat request');
+    One=true;
     reqmessage="";
     if(resssss==null){
         resssss = res;
@@ -413,6 +411,13 @@ class CustomEventSource extends EventEmitter {
     }
 
     connect() {
+        if(One){
+            One=false;
+            console.log('第一次');
+           }else{
+            console.log('第二次');
+            return null;
+         }
         const requestOptions = {
             method: this.options.method || 'GET',
             headers: {
