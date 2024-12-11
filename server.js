@@ -524,15 +524,20 @@ async function sendMessage(res3, message) {
 
 
     // 等待并点击所需元素
-    await page.waitForSelector('.chat-toolbar-item--BFmFk', { timeout: 10000 });
+ await page.waitForSelector('.chat-toolbar-item--BDUVa', { timeout: 10000 });
     if (Aborted) {
         console.log('guanbi!!!!');
         rrreeeqqq.abort();
         customEventSource.close();
         return false;
     }
-    const newMsgButton = await page.locator('.chat-toolbar-item--BFmFk').nth(5);
-    console.log('Successfully clicked the element with class "chat-toolbar-item--BFmFk"');
+
+    
+    
+
+
+    const newMsgButton = await page.locator('.chat-toolbar-item--BDUVa').nth(5);
+    console.log('Successfully clicked the element with class "chat-toolbar-item--BDUVa"');
     await newMsgButton.click();
 
    // await clickElement('.chat-toolbar-item--at7NB', page);
@@ -548,16 +553,16 @@ async function sendMessage(res3, message) {
        //输入文本
       // 输入文本
 
-      await page.click('.textarea-primary--FhHmH');
+      await page.click('.textarea-primary--dduIO');
       await page.evaluate(([selector, text]) => {
         document.querySelector(selector).value = text;
-        },[ '.textarea-primary--FhHmH', Message]); 
+        },[ '.textarea-primary--dduIO', Message]); 
 
        await new Promise(resolve => setTimeout(resolve, 500));
 
        console.log('Successfully Inputting text');
 
-       await page.type('.textarea-primary--FhHmH', ".", {delay: 10});
+       await page.type('.textarea-primary--dduIO', ".", {delay: 10});
 
        await page.keyboard.press('Backspace');
 
@@ -587,7 +592,7 @@ async function sendMessage(res3, message) {
              // 设置请求拦截
 
         await setupRequestInterception(page, res3, () => isResponseEnded = true);
-        await clickElement('.input-msg-btn--v_ei9', page);
+        await clickElement('.input-msg-btn--wKyFA', page);
        
         if (Aborted) {
             console.log('guanbi!!!!');
