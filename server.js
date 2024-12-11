@@ -524,7 +524,7 @@ async function sendMessage(res3, message) {
 
 
     // 等待并点击所需元素
- await page.waitForSelector('.chat-toolbar-item--BDUVa', { timeout: 10000 });
+ await page.waitForSelector('span[class^="chat-toolbar-item--"]', { timeout: 10000 });
     if (Aborted) {
         console.log('guanbi!!!!');
         rrreeeqqq.abort();
@@ -536,7 +536,7 @@ async function sendMessage(res3, message) {
     
 
 
-    const newMsgButton = await page.locator('.chat-toolbar-item--BDUVa').nth(5);
+    const newMsgButton = await page.locator('span[class^="chat-toolbar-item--"]').nth(5);
     console.log('Successfully clicked the element with class "chat-toolbar-item--BDUVa"');
     await newMsgButton.click();
 
@@ -553,16 +553,16 @@ async function sendMessage(res3, message) {
        //输入文本
       // 输入文本
 
-      await page.click('.textarea-primary--dduIO');
+      await page.click('textarea[data-input_node="monica-chat-input"]');
       await page.evaluate(([selector, text]) => {
         document.querySelector(selector).value = text;
-        },[ '.textarea-primary--dduIO', Message]); 
+        },[ 'textarea[data-input_node="monica-chat-input"]', Message]); 
 
        await new Promise(resolve => setTimeout(resolve, 500));
 
        console.log('Successfully Inputting text');
 
-       await page.type('.textarea-primary--dduIO', ".", {delay: 10});
+       await page.type('textarea[data-input_node="monica-chat-input"]', ".", {delay: 10});
 
        await page.keyboard.press('Backspace');
 
@@ -592,7 +592,7 @@ async function sendMessage(res3, message) {
              // 设置请求拦截
 
         await setupRequestInterception(page, res3, () => isResponseEnded = true);
-        await clickElement('.input-msg-btn--wKyFA', page);
+        await clickElement('div[class^=input-msg-btn--]', page);
        
         if (Aborted) {
             console.log('guanbi!!!!');
